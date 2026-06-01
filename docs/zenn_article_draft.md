@@ -5,8 +5,8 @@
 ## 成果物
 
 - Webアプリ: https://kitchenops-agent-yuuya-20260601.azurewebsites.net
-- GitHub: TODO
-- デモ動画: TODO
+- GitHub: https://github.com/yuuyle/kitchenops-agent
+- デモ動画: 収録後にURLを追加
 
 ## なぜ作ったか
 
@@ -30,7 +30,7 @@ KitchenOps Agent は、この「手入力が続かない」という根本課題
 
 在庫が揃ったら、家族構成、好み、栄養目標、調理時間、予算を考慮して、1週間の献立と買い足しリストを生成する。調理時は「使用」モードに切り替え、使った食材を同じカメラに通すことで在庫を減算する。使用後の残量は在庫画面から補正できる。
 
-審査員がカメラを使えない環境でも試せるよう、カメラ画面にはデモ入力ボタンを用意している。
+現在の提出版では、公開URL上でカメラ入力を使った実AIスキャンまで動作する。自動スキャンをONにすると、動画フレームを定期的に `/api/vision/scan` へ送り、Azure AI Vision と Azure OpenAI の結果を検出履歴に残す。審査員がカメラを使えない環境でも流れを確認できるよう、カメラ画面にはデモ入力ボタンも用意しているが、これはフォールバックであり本線は実カメラ入力である。
 
 ## アーキテクチャ
 
@@ -99,17 +99,19 @@ KitchenOps Agent は、単なる献立生成ではなく、食材オペレーシ
 
 ## 画像認識パイプライン
 
-現在のデモでは、APIキーなしで動く mock 認識を使っている。ただし、画面とAPIには Azure OpenAI / Azure AI Vision / OpenAI API の接続状態を表示する境界を実装済みである。
+提出版では、Azure AI Vision と Azure OpenAI を使った実APIの画像認識パイプラインを実装している。公開URLの `/api/state` では `visionProvider=azure-ready` になっており、`/api/vision/scan` へ画像を送ると Azure AI Vision の caption / tags / objects と、Azure OpenAI の食材正規化結果が検出履歴に保存される。
 
-想定する本番パイプラインは以下の通り。
+パイプラインは以下の通り。
 
 1. 固定カメラの動画フレームを取得
 2. ROI、色、輪郭、移動領域などのCV信号を抽出
-3. Azure AI Vision で食材候補を抽出
-4. Azure OpenAI で候補を構造化し、食材名、数量、単位、信頼度へ変換
+3. Azure AI Vision で caption / tags / objects を抽出
+4. Azure OpenAI で Vision signals を在庫カタログの `canonicalName` へ正規化し、食材名、数量、単位、信頼度へ変換
 5. トラッキングIDと短時間重複抑制で連続フレームを集約
 6. 信頼度が閾値以下なら確認キューへ回す
 7. 在庫DBへ登録、加算、使用、削除を反映
+
+ローカルと公開URLの両方で、バナナ画像を `canonicalName=banana` として正規化できることを確認した。検出履歴には `Azure AI Vision: caption=a banana...` と `Azure OpenAI: バナナ -> banana` のように、AIがどう判断したかを審査員が確認できる形で表示している。
 
 ## 献立生成
 
@@ -122,7 +124,7 @@ KitchenOps Agent は、単なる献立生成ではなく、食材オペレーシ
 提出アプリは Azure App Service 上で稼働している。
 
 - Azure App Service: React + Express + Node.js のアプリケーション実行基盤
-- Azure OpenAI / Azure AI Vision: 接続境界と環境変数、管理画面の状態表示を実装
+- Azure OpenAI / Azure AI Vision: 画像認識と食材正規化の実API経路、環境変数、管理画面の状態表示を実装
 - Azure SQL / Cosmos DB: クラウド同期の将来拡張先として設計
 
 App Service のNodeランタイム差異に備えて、SQLiteが利用できない場合はJSON永続化へ自動フォールバックするようにした。これにより、審査期間中にアプリが起動不能になるリスクを下げている。
@@ -130,6 +132,7 @@ App Service のNodeランタイム差異に備えて、SQLiteが利用できな�
 ## 工夫した点
 
 - カメラがなくても審査員が試せるデモ入力
+- 自動スキャンでカメラフレームを定期送信し、実AI判定までつなげる構成
 - 連続フレームをトラッキングIDで集約する設計
 - 信頼度が低い候補を確認キューへ逃がす Human-in-the-loop
 - 使用後の残量補正
@@ -138,7 +141,7 @@ App Service のNodeランタイム差異に備えて、SQLiteが利用できな�
 
 ## 今後の拡張
 
-- Azure AI Vision / Azure OpenAI 実APIによる画像認識
+- 認識対象の食材カタログ拡張と、未知食材の確認キュー運用強化
 - Azure SQL または Cosmos DB を使ったクラウド同期
 - 日本食品標準成分表ベースの栄養計算
 - バーコード / OCR / 賞味期限読み取り
