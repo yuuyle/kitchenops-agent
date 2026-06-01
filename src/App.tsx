@@ -96,6 +96,19 @@ const statusLabels: Record<StockStatus, string> = {
   expired: '期限切れ',
 }
 
+const sourceLabels: Record<IngredientStock['source'], string> = {
+  camera: 'カメラ追加',
+  manual: '手動追加',
+  seed: '初期データ',
+}
+
+const trackStatusLabels: Record<VisionTrack['status'], string> = {
+  observing: '観測中',
+  committed: '在庫反映済み',
+  needs_review: '確認待ち',
+  ignored: '重複扱い',
+}
+
 const categoryOptions = Object.entries(categoryLabels) as Array<[IngredientCategory, string]>
 const storageOptions = Object.entries(storageLabels) as Array<[StorageLocation, string]>
 const placementOptions = Object.entries(placementLabels) as Array<[CameraPlacement, string]>
@@ -122,6 +135,14 @@ const formatDate = (iso: string) =>
   new Intl.DateTimeFormat('ja-JP', {
     month: 'numeric',
     day: 'numeric',
+  }).format(new Date(iso))
+
+const formatDateTime = (iso: string) =>
+  new Intl.DateTimeFormat('ja-JP', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   }).format(new Date(iso))
 
 const freshnessScore = (inventory: IngredientStock[]) => {
@@ -854,7 +875,10 @@ function CameraView({
                 <div className="track-item" key={track.id}>
                   <div>
                     <strong>{track.label}</strong>
-                    <span>{track.id.slice(0, 8)}</span>
+                    <span>
+                      {trackStatusLabels[track.status]} / {formatDateTime(track.lastSeenAt)}
+                    </span>
+                    <span>track {track.id.slice(0, 8)}</span>
                   </div>
                   <div className={`track-status ${track.status}`}>
                     {track.frameCount} frames
@@ -870,6 +894,10 @@ function CameraView({
             <div className="detection-item" key={detection.id}>
               <div>
                 <strong>{detection.label}</strong>
+                <span>
+                  {formatDateTime(detection.observedAt)} / 信頼度 {Math.round(detection.confidence * 100)}%
+                  {detection.trackId ? ` / track ${detection.trackId.slice(0, 8)}` : ''}
+                </span>
                 <span>{detection.pipeline.fusionNote}</span>
               </div>
               <div className={`detection-badge ${detection.action}`}>
@@ -1311,6 +1339,10 @@ function StockView({
               <div>
                 <strong>{item.name}</strong>
                 <span>{categoryLabels[item.category]}</span>
+                <span className="stock-meta">
+                  {sourceLabels[item.source]} / 更新 {formatDateTime(item.updatedAt)} / 信頼度{' '}
+                  {Math.round(item.confidence * 100)}%
+                </span>
               </div>
             </div>
             <strong>

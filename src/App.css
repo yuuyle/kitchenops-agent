@@ -452,10 +452,16 @@
 .activity-item span,
 .recipe-row span,
 .stock-main span,
+.stock-meta,
 .day-card-header span,
 .quiet {
   color: var(--muted);
   font-size: 13px;
+}
+
+.stock-meta {
+  display: block;
+  overflow-wrap: anywhere;
 }
 
 .detection-badge,
