@@ -29,3 +29,6 @@ data-prod-test
 *.njsproj
 *.sln
 *.sw?
+
+# Local-only working notes and generated artifacts
+tmp/
