@@ -142,6 +142,25 @@ Invoke-Az webapp update `
   --https-only true `
   --output table
 
+Write-Host "Enabling basic publishing credentials for GitHub Actions publish profile deploy..."
+Invoke-Az resource update `
+  --resource-group $ResourceGroupName `
+  --namespace Microsoft.Web `
+  --resource-type basicPublishingCredentialsPolicies `
+  --parent "sites/$WebAppName" `
+  --name scm `
+  --set properties.allow=true `
+  --output table
+
+Invoke-Az resource update `
+  --resource-group $ResourceGroupName `
+  --namespace Microsoft.Web `
+  --resource-type basicPublishingCredentialsPolicies `
+  --parent "sites/$WebAppName" `
+  --name ftp `
+  --set properties.allow=true `
+  --output table
+
 $publishProfilePath = Join-Path (Get-Location) "$WebAppName.PublishSettings"
 Write-Host "Downloading publish profile to: $publishProfilePath"
 Invoke-Az webapp deployment list-publishing-profiles `

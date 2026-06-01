@@ -49,7 +49,7 @@ $env:NODE_ENV='production'; npm start
 
 ## データ保存
 
-API起動時に `data/kitchen.sqlite` を作成し、在庫・家族設定・献立・ログを保存します。旧バージョンの `data/kitchen.json` がある場合は初回起動時にSQLiteへ取り込みます。
+API起動時に `data/kitchen.sqlite` を作成し、在庫・家族設定・献立・ログを保存します。旧バージョンの `data/kitchen.json` がある場合は初回起動時にSQLiteへ取り込みます。App Service のNodeランタイムで `node:sqlite` が使えない場合は、起動失敗を避けるため `kitchen.runtime.json` に自動フォールバックします。
 
 ## AI接続
 

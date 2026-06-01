@@ -16,6 +16,7 @@ dist-ssr
 data/*.json
 data/*.sqlite
 data/*.sqlite-*
+data/*.runtime.json
 data-prod-test
 
 # Editor directories and files

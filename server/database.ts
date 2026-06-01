@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
 import type {
   ActivityEvent,
   CameraCalibration,
@@ -16,9 +15,21 @@ const configuredDataDir = process.env.KITCHEN_DATA_DIR
 const resolvedDataDir = configuredDataDir ? path.resolve(configuredDataDir) : dataDir
 const sqlitePath = path.join(resolvedDataDir, 'kitchen.sqlite')
 const legacyJsonPath = path.join(resolvedDataDir, 'kitchen.json')
+const fallbackJsonPath = path.join(resolvedDataDir, 'kitchen.runtime.json')
 const stateKey = 'kitchen-state'
 
-let database: DatabaseSync | undefined
+type SqliteStatement = {
+  get: (...values: unknown[]) => unknown
+  run: (...values: unknown[]) => unknown
+}
+
+type SqliteDatabase = {
+  exec: (sql: string) => void
+  prepare: (sql: string) => SqliteStatement
+}
+
+let database: SqliteDatabase | undefined
+let sqliteUnavailable = false
 
 const defaultCameraCalibration: CameraCalibration = {
   placement: 'unknown',
@@ -123,23 +134,33 @@ const createInitialState = (): KitchenState => ({
   },
 })
 
-const openDatabase = async () => {
+const openDatabase = async (): Promise<SqliteDatabase | undefined> => {
   if (database) return database
+  if (sqliteUnavailable) return undefined
 
   await fs.mkdir(resolvedDataDir, { recursive: true })
-  database = new DatabaseSync(sqlitePath)
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS app_state (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
 
-    CREATE TABLE IF NOT EXISTS app_meta (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
-  `)
+  try {
+    const sqlite = await import('node:sqlite')
+    const nextDatabase = new sqlite.DatabaseSync(sqlitePath) as unknown as SqliteDatabase
+    nextDatabase.exec(`
+      CREATE TABLE IF NOT EXISTS app_state (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS app_meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+    `)
+    database = nextDatabase
+  } catch (error) {
+    sqliteUnavailable = true
+    console.warn('SQLite is unavailable. Falling back to JSON persistence.', error)
+    return undefined
+  }
 
   return database
 }
@@ -153,7 +174,16 @@ const readLegacyJson = async (): Promise<KitchenState | undefined> => {
   }
 }
 
-const getStoredState = (db: DatabaseSync): KitchenState | undefined => {
+const readFallbackJson = async (): Promise<KitchenState | undefined> => {
+  try {
+    const raw = await fs.readFile(fallbackJsonPath, 'utf-8')
+    return JSON.parse(raw) as KitchenState
+  } catch {
+    return undefined
+  }
+}
+
+const getStoredState = (db: SqliteDatabase): KitchenState | undefined => {
   const row = db
     .prepare('SELECT value FROM app_state WHERE key = ?')
     .get(stateKey) as { value: string } | undefined
@@ -162,7 +192,7 @@ const getStoredState = (db: DatabaseSync): KitchenState | undefined => {
   return JSON.parse(row.value) as KitchenState
 }
 
-const persistState = (db: DatabaseSync, state: KitchenState) => {
+const persistState = (db: SqliteDatabase, state: KitchenState) => {
   const normalized = normalizeState(state)
 
   db.prepare(
@@ -186,8 +216,27 @@ const persistState = (db: DatabaseSync, state: KitchenState) => {
   return normalized
 }
 
+const persistJsonState = async (state: KitchenState) => {
+  const normalized = normalizeState(state)
+
+  await fs.mkdir(resolvedDataDir, { recursive: true })
+  await fs.writeFile(fallbackJsonPath, JSON.stringify(normalized, null, 2))
+
+  return normalized
+}
+
 const ensureState = async () => {
   const db = await openDatabase()
+
+  if (!db) {
+    const stored = await readFallbackJson()
+    if (stored) return normalizeState(stored)
+
+    const migrated = await readLegacyJson()
+    const initial = migrated ?? createInitialState()
+    return persistJsonState(initial)
+  }
+
   const stored = getStoredState(db)
 
   if (stored) return normalizeState(stored)
@@ -201,6 +250,8 @@ export const readState = async (): Promise<KitchenState> => ensureState()
 
 export const writeState = async (state: KitchenState): Promise<KitchenState> => {
   const db = await openDatabase()
+  if (!db) return persistJsonState(state)
+
   return persistState(db, state)
 }
 
