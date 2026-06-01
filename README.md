@@ -95,6 +95,8 @@ App Service では `npm start` により `dist-server/server/index.js` を起動
 - `NODE_ENV=production`
 - `KITCHEN_DATA_DIR=/home/data/kitchenops-agent`
 - `WEBSITES_CONTAINER_START_TIME_LIMIT=600`
+- `APP_PUBLIC_ORIGIN`
+- `ALLOW_VISION_IMAGE_URL=false`
 - `AZURE_OPENAI_ENDPOINT`
 - `AZURE_OPENAI_API_KEY`
 - `AZURE_OPENAI_DEPLOYMENT`
@@ -102,6 +104,14 @@ App Service では `npm start` により `dist-server/server/index.js` を起動
 - `AZURE_AI_VISION_ENDPOINT`
 - `AZURE_AI_VISION_API_KEY`
 - `AZURE_AI_VISION_API_VERSION`
+
+## 公開デモのセキュリティ
+
+- Azure の接続キーや Publish Profile は GitHub に含めず、App Service / GitHub Actions のシークレットで管理します。
+- 本番では CORS を同一オリジンに制限し、主要なセキュリティヘッダーを付与します。
+- `/api/vision/scan` などの更新系APIには簡易レート制限を入れています。
+- 外部画像URLを渡す Vision スキャンは、公開環境では `ALLOW_VISION_IMAGE_URL=false` のままにします。
+- この提出版は公開デモ用のため、入力した在庫・家族設定は公開データとして扱ってください。実運用化する場合はユーザー認証とユーザー別DB分離を追加します。
 
 ## ドキュメント整理
 

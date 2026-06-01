@@ -18,9 +18,105 @@ const port = Number(process.env.PORT ?? 8787)
 const isProduction = process.env.NODE_ENV === 'production'
 const clientDistPath = path.join(process.cwd(), 'dist')
 const clientIndexPath = path.join(clientDistPath, 'index.html')
+const allowVisionImageUrl = process.env.ALLOW_VISION_IMAGE_URL === 'true'
 
-app.use(cors())
+app.set('trust proxy', 1)
+
+const configuredOrigins = (process.env.APP_PUBLIC_ORIGIN ?? '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean)
+const azureOrigin = process.env.WEBSITE_HOSTNAME
+  ? `https://${process.env.WEBSITE_HOSTNAME}`
+  : undefined
+const allowedOrigins = new Set([...configuredOrigins, azureOrigin].filter(Boolean))
+
+app.use((_request, response, next) => {
+  response.setHeader('X-Content-Type-Options', 'nosniff')
+  response.setHeader('Referrer-Policy', 'no-referrer')
+  response.setHeader('X-Frame-Options', 'DENY')
+  response.setHeader('Cross-Origin-Resource-Policy', 'same-origin')
+  response.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()')
+  response.setHeader(
+    'Content-Security-Policy',
+    [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: https: blob:",
+      "connect-src 'self'",
+      "media-src 'self' blob:",
+      "font-src 'self' data:",
+    ].join('; '),
+  )
+  next()
+})
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!isProduction || !origin) {
+        callback(null, true)
+        return
+      }
+
+      try {
+        const normalizedOrigin = new URL(origin).origin
+        callback(null, allowedOrigins.has(normalizedOrigin))
+      } catch {
+        callback(null, false)
+      }
+    },
+  }),
+)
 app.use(express.json({ limit: '12mb' }))
+
+const rateBuckets = new Map<string, { count: number; resetAt: number }>()
+
+const rateLimit =
+  (name: string, maxRequests: number, windowMs: number): express.RequestHandler =>
+  (request, response, next) => {
+    if (!isProduction) {
+      next()
+      return
+    }
+
+    const forwardedFor = request.headers['x-forwarded-for']
+    const clientIp =
+      (Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor)?.split(',')[0]?.trim() ||
+      request.ip ||
+      'unknown'
+    const now = Date.now()
+    const key = `${name}:${clientIp}`
+    const current = rateBuckets.get(key)
+
+    if (!current || current.resetAt <= now) {
+      rateBuckets.set(key, { count: 1, resetAt: now + windowMs })
+      next()
+      return
+    }
+
+    current.count += 1
+
+    if (current.count > maxRequests) {
+      const retryAfterSeconds = Math.ceil((current.resetAt - now) / 1000)
+      response.setHeader('Retry-After', String(retryAfterSeconds))
+      response.status(429).json({ message: 'too many requests' })
+      return
+    }
+
+    next()
+  }
+
+setInterval(() => {
+  const now = Date.now()
+  for (const [key, bucket] of rateBuckets.entries()) {
+    if (bucket.resetAt <= now) rateBuckets.delete(key)
+  }
+}, 10 * 60 * 1000).unref()
 
 const categorySchema = z.enum([
   'vegetable',
@@ -98,6 +194,9 @@ const cameraCalibrationSchema = z.object({
   lastCalibratedAt: z.string().optional(),
 })
 
+const routeParam = (value: string | string[] | undefined) =>
+  Array.isArray(value) ? (value[0] ?? '') : (value ?? '')
+
 app.get('/api/health', (_request, response) => {
   response.json({ ok: true, service: 'kitchen-ai', port })
 })
@@ -114,7 +213,7 @@ app.get('/api/state', async (_request, response, next) => {
   }
 })
 
-app.patch('/api/family', async (request, response, next) => {
+app.patch('/api/family', rateLimit('family-write', 120, 10 * 60 * 1000), async (request, response, next) => {
   try {
     const input = familyProfileSchema.parse(request.body)
     const familyProfile = {
@@ -139,7 +238,7 @@ app.patch('/api/family', async (request, response, next) => {
   }
 })
 
-app.post('/api/inventory', async (request, response, next) => {
+app.post('/api/inventory', rateLimit('inventory-write', 180, 10 * 60 * 1000), async (request, response, next) => {
   try {
     const input = stockSchema.parse(request.body)
     const createdAt = new Date().toISOString()
@@ -172,7 +271,7 @@ app.post('/api/inventory', async (request, response, next) => {
   }
 })
 
-app.patch('/api/inventory/:id', async (request, response, next) => {
+app.patch('/api/inventory/:id', rateLimit('inventory-write', 180, 10 * 60 * 1000), async (request, response, next) => {
   try {
     const patch = stockPatchSchema.parse(request.body)
     let found = false
@@ -206,7 +305,7 @@ app.patch('/api/inventory/:id', async (request, response, next) => {
   }
 })
 
-app.delete('/api/inventory/:id', async (request, response, next) => {
+app.delete('/api/inventory/:id', rateLimit('inventory-write', 180, 10 * 60 * 1000), async (request, response, next) => {
   try {
     let deletedName = ''
     const state = await updateState((current) => {
@@ -236,9 +335,15 @@ app.delete('/api/inventory/:id', async (request, response, next) => {
   }
 })
 
-app.post('/api/vision/scan', async (request, response, next) => {
+app.post('/api/vision/scan', rateLimit('vision-scan', 180, 10 * 60 * 1000), async (request, response, next) => {
   try {
     const input = visionScanSchema.parse(request.body) satisfies VisionScanRequest
+
+    if (input.imageUrl && !allowVisionImageUrl) {
+      response.status(400).json({ message: 'imageUrl scan is disabled' })
+      return
+    }
+
     const state = await updateState((current) => scanFrame(current, input))
     const detections = state.detections.slice(0, 1)
 
@@ -254,7 +359,7 @@ app.post('/api/vision/scan', async (request, response, next) => {
   }
 })
 
-app.patch('/api/camera/calibration', async (request, response, next) => {
+app.patch('/api/camera/calibration', rateLimit('camera-write', 60, 10 * 60 * 1000), async (request, response, next) => {
   try {
     const calibration = cameraCalibrationSchema.parse(request.body) satisfies CameraCalibration
     const lastCalibratedAt = new Date().toISOString()
@@ -284,7 +389,7 @@ app.patch('/api/camera/calibration', async (request, response, next) => {
   }
 })
 
-app.post('/api/meal-plan/generate', async (_request, response, next) => {
+app.post('/api/meal-plan/generate', rateLimit('meal-plan', 30, 10 * 60 * 1000), async (_request, response, next) => {
   try {
     const state = await updateState((current) => generateMealPlan(current))
 
@@ -298,10 +403,11 @@ app.post('/api/meal-plan/generate', async (_request, response, next) => {
   }
 })
 
-app.post('/api/review/:id/approve', async (request, response, next) => {
+app.post('/api/review/:id/approve', rateLimit('review-write', 120, 10 * 60 * 1000), async (request, response, next) => {
   try {
+    const reviewId = routeParam(request.params.id)
     const state = await updateState((current) =>
-      resolveReviewItem(current, request.params.id, 'approve'),
+      resolveReviewItem(current, reviewId, 'approve'),
     )
 
     response.json(state)
@@ -310,10 +416,11 @@ app.post('/api/review/:id/approve', async (request, response, next) => {
   }
 })
 
-app.post('/api/review/:id/reject', async (request, response, next) => {
+app.post('/api/review/:id/reject', rateLimit('review-write', 120, 10 * 60 * 1000), async (request, response, next) => {
   try {
+    const reviewId = routeParam(request.params.id)
     const state = await updateState((current) =>
-      resolveReviewItem(current, request.params.id, 'reject'),
+      resolveReviewItem(current, reviewId, 'reject'),
     )
 
     response.json(state)
@@ -357,6 +464,16 @@ app.use((error: unknown, _request: express.Request, response: express.Response, 
 
   if (error instanceof z.ZodError) {
     response.status(400).json({ message: 'validation error', issues: error.issues })
+    return
+  }
+
+  const httpError = error as { status?: number; statusCode?: number; type?: string }
+  const status = httpError.status ?? httpError.statusCode
+
+  if (status && status >= 400 && status < 500) {
+    response.status(status).json({
+      message: httpError.type === 'entity.too.large' ? 'payload too large' : 'bad request',
+    })
     return
   }
 
