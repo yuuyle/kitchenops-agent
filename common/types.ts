@@ -193,7 +193,7 @@ export interface ActivityEvent {
 }
 
 export interface SystemStatus {
-  visionProvider: 'mock' | 'openai-ready'
+  visionProvider: 'mock' | 'openai-ready' | 'azure-ready'
   recipeProvider: 'mock-web-research'
   cameraCadenceMs: number
   confidenceThreshold: number
@@ -223,6 +223,7 @@ export interface KitchenState {
 export interface VisionScanRequest {
   mode: IntakeMode
   imageData?: string
+  imageUrl?: string
   demoCanonicalName?: string
 }
 

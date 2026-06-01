@@ -8,6 +8,7 @@ import type {
   KitchenState,
   StockStatus,
 } from '../common/types.ts'
+import { azureAiFoodPipelineConfigured } from './azureAi.ts'
 import { defaultFamilyProfile, defaultInventory, nowIso, recipeCatalog } from './catalog.ts'
 
 const dataDir = path.join(process.cwd(), 'data')
@@ -60,6 +61,12 @@ const normalizeStock = (item: IngredientStock): IngredientStock => ({
   status: statusFor(item.expiresAt),
 })
 
+const visionProvider = () => {
+  if (azureAiFoodPipelineConfigured()) return 'azure-ready'
+  if (process.env.OPENAI_API_KEY) return 'openai-ready'
+  return 'mock'
+}
+
 const normalizeState = (state: KitchenState): KitchenState => ({
   ...state,
   familyProfile: {
@@ -87,7 +94,7 @@ const normalizeState = (state: KitchenState): KitchenState => ({
   detections: state.detections.slice(0, 80),
   events: state.events.slice(0, 80),
   status: {
-    visionProvider: process.env.OPENAI_API_KEY ? 'openai-ready' : 'mock',
+    visionProvider: visionProvider(),
     recipeProvider: state.status?.recipeProvider ?? 'mock-web-research',
     cameraCadenceMs: state.status?.cameraCadenceMs ?? 2600,
     confidenceThreshold: state.status?.confidenceThreshold ?? 0.76,
@@ -126,7 +133,7 @@ const createInitialState = (): KitchenState => ({
     ),
   ],
   status: {
-    visionProvider: process.env.OPENAI_API_KEY ? 'openai-ready' : 'mock',
+    visionProvider: visionProvider(),
     recipeProvider: 'mock-web-research',
     cameraCadenceMs: 2600,
     confidenceThreshold: 0.76,

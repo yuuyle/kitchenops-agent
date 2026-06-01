@@ -79,6 +79,7 @@ const familyProfileSchema = z.object({
 const visionScanSchema = z.object({
   mode: z.enum(['intake', 'consume']),
   imageData: z.string().optional(),
+  imageUrl: z.string().url().optional(),
   demoCanonicalName: z.string().optional(),
 })
 

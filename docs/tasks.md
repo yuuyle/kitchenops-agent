@@ -1,5 +1,17 @@
 # 開発タスク
 
+## 2026-06-01 AI実装更新
+
+- [x] `/api/vision/scan` に Azure AI Vision + Azure OpenAI の実API判定経路を追加
+- [x] 固定カメラのキャプチャ画像を Azure AI Vision で解析し、caption/tags/objects を取得
+- [x] Azure AI Vision の解析結果を Azure OpenAI に渡し、既存在庫カタログの `canonicalName` へ正規化
+- [x] AI判定結果の `cvSignal` / `llmSignal` / `fusionNote` を検出履歴に保存
+- [x] Azure AI 未設定時やAI判定失敗時は既存デモ候補へフォールバック
+- [x] ローカルで実AIスキャン疎通確認済み: バナナ画像 -> `canonicalName=banana`
+- [x] `npm run build` / `npm run lint` 成功
+- [ ] GitHub Actions で Azure App Service に実AIスキャン実装をデプロイ
+- [ ] 公開URLでカメラ入力から Azure AI Vision + Azure OpenAI の実動作確認
+
 ## 完了済み
 
 - [x] React + TypeScript + Vite のフロントエンドを作成
@@ -39,6 +51,8 @@
 - [x] Canada Central向けAzure CLI作成スクリプトを追加
 - [x] Azure App Service に実デプロイして成果物URLを作成
 - [x] Azure公開URLの `/api/health` と `/api/integrations` を確認
+- [x] Azure公開URLでデモ食材スキャンAPIを確認
+- [x] Azure公開URLで献立生成APIを確認
 - [x] カメラなしで審査員が確認できるデモ用サンプル入力を追加
 - [x] Azure OpenAI / Azure AI Vision / OpenAI API の接続状態APIを追加
 - [x] Microsoft AI 連携状態を管理画面に表示
@@ -46,6 +60,15 @@
 - [x] Zenn記事ドラフトを作成
 - [x] アーキテクチャ図のMermaid案を作成
 - [x] 3分デモ動画台本を作成
+- [x] 公開アプリのAPI動作確認メモを作成
+- [x] Azure OpenAI / Azure AI Vision App Service設定用スクリプトを作成
+- [x] Azure OpenAI / Azure AI Vision リソース作成手順を詳細化
+- [x] Azure AI Foundryでエージェント作成が不要なことを手順に追記
+- [x] Azure OpenAI / Azure AI Vision ローカル疎通確認スクリプトを作成
+- [x] Azure OpenAI / Azure AI Vision のローカル疎通確認に成功
+- [x] Azure OpenAI リソースを作成し、App Service環境変数へ設定
+- [x] Azure AI Vision リソースを作成し、App Service環境変数へ設定
+- [x] 公開アプリの `/api/integrations` で Azure OpenAI / Azure AI Vision が `configured=true` になることを確認
 
 ## 次に実装するべきこと
 

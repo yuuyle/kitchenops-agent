@@ -13,7 +13,8 @@
     "build:server": "tsc -p tsconfig.server.json",
     "build:web": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:azure-ai": "node scripts/test-azure-ai-connectivity.mjs"
   },
   "dependencies": {
     "cors": "^2.8.6",

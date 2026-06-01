@@ -48,10 +48,10 @@ export const api = {
     requestJson<{ ok: boolean; inventory: IngredientStock[] }>(`/api/inventory/${id}`, {
       method: 'DELETE',
     }),
-  scanFrame: (mode: IntakeMode, imageData?: string, demoCanonicalName?: string) =>
+  scanFrame: (mode: IntakeMode, imageData?: string, demoCanonicalName?: string, imageUrl?: string) =>
     requestJson<VisionScanResponse>('/api/vision/scan', {
       method: 'POST',
-      body: JSON.stringify({ mode, imageData, demoCanonicalName }),
+      body: JSON.stringify({ mode, imageData, demoCanonicalName, imageUrl }),
     }),
   saveCameraCalibration: (calibration: CameraCalibration) =>
     requestJson<CameraCalibration>('/api/camera/calibration', {

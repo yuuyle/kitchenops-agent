@@ -376,6 +376,12 @@ function App() {
   const expiringCount = state.inventory.filter((item) => item.status === 'use-soon').length
   const expiredCount = state.inventory.filter((item) => item.status === 'expired').length
   const pendingReviewCount = state.reviewQueue.filter((item) => item.status === 'pending').length
+  const visionProviderLabel =
+    state.status.visionProvider === 'azure-ready'
+      ? 'Azure AI'
+      : state.status.visionProvider === 'openai-ready'
+        ? 'Vision Ready'
+        : 'Mock Vision'
 
   return (
     <div className="app-shell">
@@ -407,7 +413,7 @@ function App() {
         <div className="system-strip">
           <div>
             <Eye size={16} />
-            <span>{state.status.visionProvider === 'mock' ? 'Mock Vision' : 'Vision Ready'}</span>
+            <span>{visionProviderLabel}</span>
           </div>
           <div>
             <Clock3 size={16} />

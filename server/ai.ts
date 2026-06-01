@@ -13,6 +13,7 @@ import type {
   VisionScanRequest,
   VisionTrack,
 } from '../common/types.ts'
+import { classifyFoodWithAzureAi } from './azureAi.ts'
 import { addDaysIso, nowIso, recipeCatalog, visionCandidates } from './catalog.ts'
 import { createEvent } from './database.ts'
 
@@ -76,15 +77,43 @@ const createStockFromDetection = (
   status: 'ok',
 })
 
-const createDetection = (
+const createDetection = async (
   mode: IntakeMode,
   request: VisionScanRequest,
-): {
+): Promise<{
   detection: VisionDetection
   storage: IngredientStock['storage']
   shelfLifeDays: number
-} => {
-  const hash = hashImage(request.imageData)
+}> => {
+  if (!request.demoCanonicalName && (request.imageData || request.imageUrl)) {
+    try {
+      const aiCandidate = await classifyFoodWithAzureAi(request)
+
+      if (aiCandidate) {
+        return {
+          storage: aiCandidate.storage,
+          shelfLifeDays: aiCandidate.shelfLifeDays,
+          detection: {
+            id: randomUUID(),
+            mode,
+            label: aiCandidate.label,
+            canonicalName: aiCandidate.canonicalName,
+            category: aiCandidate.category,
+            quantity: aiCandidate.quantity,
+            unit: aiCandidate.unit,
+            confidence: aiCandidate.confidence,
+            observedAt: nowIso(),
+            action: 'needs_review',
+            pipeline: aiCandidate.pipeline,
+          },
+        }
+      }
+    } catch (error) {
+      console.warn('Azure AI food classification failed. Falling back to local candidate.', error)
+    }
+  }
+
+  const hash = hashImage(request.imageData ?? request.imageUrl)
   const demoCandidate = request.demoCanonicalName
     ? visionCandidates.find((item) => item.canonicalName === request.demoCanonicalName)
     : undefined
@@ -134,8 +163,11 @@ const createReviewItem = (detection: VisionDetection, reason: string): ReviewQue
   createdAt: nowIso(),
 })
 
-export const scanFrame = (state: KitchenState, request: VisionScanRequest): KitchenState => {
-  const candidate = createDetection(request.mode, request)
+export const scanFrame = async (
+  state: KitchenState,
+  request: VisionScanRequest,
+): Promise<KitchenState> => {
+  const candidate = await createDetection(request.mode, request)
   const detection = candidate.detection
   const events = [...state.events]
   let inventory = [...state.inventory]
