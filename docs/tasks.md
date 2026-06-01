@@ -9,8 +9,9 @@
 - [x] Azure AI 未設定時やAI判定失敗時は既存デモ候補へフォールバック
 - [x] ローカルで実AIスキャン疎通確認済み: バナナ画像 -> `canonicalName=banana`
 - [x] `npm run build` / `npm run lint` 成功
-- [ ] GitHub Actions で Azure App Service に実AIスキャン実装をデプロイ
-- [ ] 公開URLでカメラ入力から Azure AI Vision + Azure OpenAI の実動作確認
+- [x] GitHub Actions で Azure App Service に実AIスキャン実装をデプロイ
+- [x] 公開URLで画像入力から Azure AI Vision + Azure OpenAI の実動作確認
+- [x] App Service の起動猶予 `WEBSITES_CONTAINER_START_TIME_LIMIT=600` を設定
 
 ## 完了済み
 

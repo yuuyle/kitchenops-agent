@@ -9,8 +9,11 @@
 | Azure OpenAI | OK | Vision signals を `バナナ -> banana` に正規化 |
 | `npm run build` | OK | client / server production build 成功 |
 | `npm run lint` | OK | ESLint 成功 |
+| Azure App Service デプロイ | OK | `hackathon-submission-ai-2026-06-01` タグで GitHub Actions 成功 |
+| 公開URL `/api/state` | OK | `visionProvider=azure-ready` |
+| 公開URL `/api/vision/scan` 実AI経路 | OK | バナナ画像URLを送信し、Azure AI Vision + Azure OpenAI で `canonicalName=banana` |
 
-次の確認: GitHub Actions でデプロイ後、公開URL上のカメラ入力から同じAI経路が動くことを確認する。
+次の確認: 公開URL上のブラウザ画面で、実カメラ入力から同じAI経路が動くことを確認する。
 
 確認日: 2026-06-01
 対象URL: https://kitchenops-agent-yuuya-20260601.azurewebsites.net
