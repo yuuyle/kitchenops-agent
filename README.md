@@ -46,6 +46,10 @@ $env:NODE_ENV='production'; npm start
 - [開発タスク](docs/tasks.md)
 - [Azure App Service デプロイ手順](docs/azure_app_service_deployment.md)
 - [ハッカソン提出計画](docs/hackathon_submission_plan.md)
+- [提出用リンク整理](docs/submission_links.md)
+- [Zenn記事ドラフト](docs/zenn_article_draft.md)
+- [アーキテクチャ図](docs/architecture.md)
+- [3分デモ動画台本](docs/demo_video_script.md)
 
 ## データ保存
 

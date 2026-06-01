@@ -37,15 +37,20 @@
 - [x] Azure App Service用GitHub Actions雛形を追加
 - [x] Azureデプロイ手順を作成
 - [x] Canada Central向けAzure CLI作成スクリプトを追加
+- [x] Azure App Service に実デプロイして成果物URLを作成
+- [x] Azure公開URLの `/api/health` と `/api/integrations` を確認
 - [x] カメラなしで審査員が確認できるデモ用サンプル入力を追加
 - [x] Azure OpenAI / Azure AI Vision / OpenAI API の接続状態APIを追加
 - [x] Microsoft AI 連携状態を管理画面に表示
+- [x] 提出用URLと審査員向け試用手順を整理
+- [x] Zenn記事ドラフトを作成
+- [x] アーキテクチャ図のMermaid案を作成
+- [x] 3分デモ動画台本を作成
 
 ## 次に実装するべきこと
 
 - [ ] クラウド同期を追加
 - [ ] クラウド同期用の最小アカウント/端末紐付けを追加
-- [ ] Azure App Service に実デプロイして成果物URLを作る
 - [ ] GitHub公開リポジトリを作成して提出タグを切る
 - [ ] OpenAI 画像認識プロバイダを実装
 - [ ] Azure OpenAI 画像認識プロバイダを実装
