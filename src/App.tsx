@@ -50,6 +50,15 @@ import type {
 } from '../common/types.ts'
 
 type View = 'camera' | 'plan' | 'recipes' | 'stock' | 'family'
+type CameraScanOverlay = {
+  id: string
+  mode: IntakeMode
+  label: string
+  action: VisionDetection['action']
+  confidence: number
+  quantity: number
+  unit: string
+}
 
 const categoryLabels: Record<IngredientCategory, string> = {
   vegetable: '野菜',
@@ -175,6 +184,23 @@ const actionLabel = (detection: VisionDetection) => {
   }
 }
 
+const scanOverlayMessage = (overlay: CameraScanOverlay) => {
+  switch (overlay.action) {
+    case 'added':
+      return `${overlay.quantity}${overlay.unit}を在庫に登録`
+    case 'increased':
+      return `${overlay.quantity}${overlay.unit}を在庫に加算`
+    case 'consumed':
+      return `${overlay.quantity}${overlay.unit}を使用として反映`
+    case 'removed':
+      return '使い切りとして在庫から削除'
+    case 'ignored_duplicate':
+      return '連続検出としてトラッキングに集約'
+    case 'needs_review':
+      return '確認キューに送信'
+  }
+}
+
 const tabItems: Array<{ id: View; label: string; Icon: typeof Camera }> = [
   { id: 'camera', label: 'カメラ', Icon: Camera },
   { id: 'plan', label: '献立', Icon: CalendarDays },
@@ -194,9 +220,11 @@ function App() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | undefined>()
   const [error, setError] = useState<string | null>(null)
+  const [scanOverlay, setScanOverlay] = useState<CameraScanOverlay | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const scanOverlayTimerRef = useRef<number | null>(null)
 
   const refreshState = useCallback(async () => {
     const [nextState, integrationResult] = await Promise.all([api.getState(), api.getIntegrations()])
@@ -256,6 +284,38 @@ function App() {
     )
   }, [])
 
+  const showScanOverlay = useCallback((detection?: VisionDetection) => {
+    if (!detection) return
+
+    if (scanOverlayTimerRef.current) {
+      window.clearTimeout(scanOverlayTimerRef.current)
+    }
+
+    setScanOverlay({
+      id: detection.id,
+      mode: detection.mode,
+      label: detection.label,
+      action: detection.action,
+      confidence: detection.confidence,
+      quantity: detection.quantity,
+      unit: detection.unit,
+    })
+
+    scanOverlayTimerRef.current = window.setTimeout(() => {
+      setScanOverlay(null)
+      scanOverlayTimerRef.current = null
+    }, 4600)
+  }, [])
+
+  useEffect(
+    () => () => {
+      if (scanOverlayTimerRef.current) {
+        window.clearTimeout(scanOverlayTimerRef.current)
+      }
+    },
+    [],
+  )
+
   const runScan = useCallback(async () => {
     if (isScanning) return
 
@@ -265,12 +325,13 @@ function App() {
     try {
       const result = await api.scanFrame(mode, captureFrame())
       applyVisionScanResult(result)
+      showScanOverlay(result.detections[0])
     } catch (reason) {
       setError(String(reason))
     } finally {
       setIsScanning(false)
     }
-  }, [applyVisionScanResult, captureFrame, isScanning, mode])
+  }, [applyVisionScanResult, captureFrame, isScanning, mode, showScanOverlay])
 
   const runDemoScan = useCallback(
     async (canonicalName: string) => {
@@ -282,13 +343,14 @@ function App() {
       try {
         const result = await api.scanFrame(mode, undefined, canonicalName)
         applyVisionScanResult(result)
+        showScanOverlay(result.detections[0])
       } catch (reason) {
         setError(String(reason))
       } finally {
         setIsScanning(false)
       }
     },
-    [applyVisionScanResult, isScanning, mode],
+    [applyVisionScanResult, isScanning, mode, showScanOverlay],
   )
 
   useEffect(() => {
@@ -327,6 +389,7 @@ function App() {
     streamRef.current?.getTracks().forEach((track) => track.stop())
     streamRef.current = null
     setCameraActive(false)
+    setScanOverlay(null)
   }
 
   const generatePlan = async () => {
@@ -496,6 +559,7 @@ function App() {
             reviewQueue={state.reviewQueue}
             integrations={integrations}
             calibration={state.cameraCalibration}
+            scanOverlay={scanOverlay}
             videoRef={videoRef}
             canvasRef={canvasRef}
             onStart={startCamera}
@@ -577,6 +641,7 @@ function CameraView({
   reviewQueue,
   integrations,
   calibration,
+  scanOverlay,
   videoRef,
   canvasRef,
   onStart,
@@ -597,6 +662,7 @@ function CameraView({
   reviewQueue: ReviewQueueItem[]
   integrations: IntegrationStatus[]
   calibration: CameraCalibration
+  scanOverlay: CameraScanOverlay | null
   videoRef: RefObject<HTMLVideoElement | null>
   canvasRef: RefObject<HTMLCanvasElement | null>
   onStart: () => void
@@ -643,6 +709,23 @@ function CameraView({
           </div>
         ) : null}
         <div className="scan-line" />
+        {scanOverlay ? (
+          <div
+            className={`scan-result-overlay ${scanOverlay.action}`}
+            key={scanOverlay.id}
+            role="status"
+            aria-live="polite"
+          >
+            <div className="scan-result-kicker">
+              <ScanLine size={16} />
+              <span>{scanOverlay.mode === 'intake' ? '入庫スキャン' : '使用スキャン'}</span>
+            </div>
+            <strong>{scanOverlay.label}</strong>
+            <span>
+              {scanOverlayMessage(scanOverlay)} / 信頼度 {Math.round(scanOverlay.confidence * 100)}%
+            </span>
+          </div>
+        ) : null}
       </div>
 
       <div className="control-panel">
