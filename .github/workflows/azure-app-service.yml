@@ -1,0 +1,54 @@
+name: Deploy KitchenOps Agent to Azure App Service
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'hackathon-submission-*'
+
+env:
+  AZURE_WEBAPP_NAME: kitchenops-agent-yuuya-20260601
+  NODE_VERSION: '24.x'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Keep production dependencies only
+        run: npm prune --omit=dev
+
+      - name: Create deployment package
+        run: |
+          zip -r release.zip \
+            dist \
+            dist-server \
+            node_modules \
+            package.json \
+            package-lock.json \
+            .env.example
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: release.zip
