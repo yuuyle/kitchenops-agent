@@ -30,6 +30,8 @@ Microsoft Agent Hackathon powered by Tokyo Electron Device 向けの提出プロ
 5. 献立生成を押すと、在庫を考慮した1週間の献立、レシピ、買い足しリストが生成されます。
 6. 使用モードで同じ食材を映すと、在庫数量が減ります。
 
+ステップ・バイ・ステップの操作手順は [docs/operation_guide.md](docs/operation_guide.md) を参照してください。
+
 ## アーキテクチャ
 
 ```mermaid
